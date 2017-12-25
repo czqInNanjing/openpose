@@ -66,10 +66,10 @@ public:
                     // // if (result < 0)
                     // //     return result;
 
-                    // Reset trigger
-                    auto result = resetTrigger(iNodeMap);
-                    if (result < 0)
-                        op::error("Error happened..." + std::to_string(result), __LINE__, __FUNCTION__, __FILE__);
+                    // // Reset trigger
+                    // auto result = resetTrigger(iNodeMap);
+                    // if (result < 0)
+                    //     op::error("Error happened..." + std::to_string(result), __LINE__, __FUNCTION__, __FILE__);
 
                     // Deinitialize each camera
                     // Each camera must be deinitialized separately by first
@@ -278,12 +278,9 @@ public:
     {
         try
         {
-            // Security checks
-            if (cameraList.GetSize() != INTRINSICS.size())
-                op::checkE(cameraList.GetSize(), INTRINSICS.size(), "The number of cameras must be the same as the INTRINSICS vector size.", __LINE__, __FUNCTION__, __FILE__);
-
+           
             std::vector<cv::Mat> cvMats;
-
+            op::log("here1 ");
             // Retrieve, convert, and return an image for each camera
             // In order to work with simultaneous camera streams, nested loops are
             // needed. It is important that the inner loop be the one iterating
@@ -294,7 +291,7 @@ public:
             std::vector<Spinnaker::CameraPtr> cameraPtrs(cameraList.GetSize());
             for (auto i = 0u; i < cameraPtrs.size(); i++)
                 cameraPtrs.at(i) = cameraList.GetByIndex(i);
-
+            op::log("here2");
             std::vector<Spinnaker::ImagePtr> imagePtrs(cameraPtrs.size());
 
             // Getting frames
@@ -324,7 +321,11 @@ public:
                     break;
                 }
                 else
-                {
+                {   
+
+                    op::log("Image width " + std::to_string(imagePtr->GetWidth()) + " Image Height " + std::to_string(imagePtr->GetHeight()) + "",
+                            op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
+
                     // Print image information
                     // Convert image to RGB
                     // Interpolation methods
@@ -369,8 +370,8 @@ public:
                     // Undistort
                     // http://docs.opencv.org/2.4/modules/imgproc/doc/geometric_transformations.html#undistort
                     auto auxCvMat = pointGreyToCvMat(imagePtrs.at(i));
+                    imagePtrs.at(i)->Release();
                     cvMats.emplace_back();
-                    cv::undistort(auxCvMat, cvMats[i], INTRINSICS[i], DISTORTIONS[i]);
                 }
             }
 
@@ -479,6 +480,7 @@ public:
                 cv::imshow("User worker GUI", datumsPtr->at(0).cvOutputData);
                 // It displays the image and sleeps at least 1 ms (it usually sleeps ~5-10 msec to display the image)
                 cv::waitKey(1);
+                op::log("Array floats of the datum is ");
             }
         }
         catch (const std::exception& e)
@@ -506,7 +508,7 @@ int openPoseTutorialThread4()
     op::ThreadManager<TypedefDatums> threadManager;
     // Step 3 - Initializing the worker classes
     // Frames producer (e.g. video, webcam, ...)
-    TypedefWorker wUserInput = std::make_shared<WUserInput>(FLAGS_image_dir);
+    TypedefWorker wUserInput = std::make_shared<WUserInput>();
     // Processing
     TypedefWorker wUserProcessing = std::make_shared<WUserPostProcessing>();
     // GUI (Display)

@@ -97,6 +97,7 @@ find_package(CuDNN)
 find_package(GFlags)
 find_package(Glog)
 find_package(OpenCV)
+find_package(Spinnaker)
 
 if (NOT Boost_FOUND)
   message(FATAL_ERROR "Boost not found. Install Boost from the command line using the command(s) --\
@@ -192,7 +193,8 @@ include_directories(
   ${GFLAGS_INCLUDE_DIR}
   ${GLOG_INCLUDE_DIR}
   ${Caffe_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS})
+  ${OpenCV_INCLUDE_DIRS}
+  ${Spinnaker_INCLUDE_DIRS})
 
 ### ADD SUBDIRECTORIES
 
