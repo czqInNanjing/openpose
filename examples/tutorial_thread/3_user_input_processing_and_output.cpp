@@ -128,8 +128,9 @@ public:
         try
         {
             if (datumsPtr != nullptr && !datumsPtr->empty())
-                for (auto& datum : *datumsPtr)
+                for (auto& datum : *datumsPtr) {
                     cv::bitwise_not(datum.cvInputData, datum.cvOutputData);
+                }
         }
         catch (const std::exception& e)
         {

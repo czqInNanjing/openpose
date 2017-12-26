@@ -280,7 +280,6 @@ public:
         {
            
             std::vector<cv::Mat> cvMats;
-            op::log("here1 ");
             // Retrieve, convert, and return an image for each camera
             // In order to work with simultaneous camera streams, nested loops are
             // needed. It is important that the inner loop be the one iterating
@@ -291,8 +290,15 @@ public:
             std::vector<Spinnaker::CameraPtr> cameraPtrs(cameraList.GetSize());
             for (auto i = 0u; i < cameraPtrs.size(); i++)
                 cameraPtrs.at(i) = cameraList.GetByIndex(i);
-            op::log("here2");
+            
             std::vector<Spinnaker::ImagePtr> imagePtrs(cameraPtrs.size());
+
+            
+            auto sleepSeconds = 100;
+            op::log("Sleep for "+ std::to_string(sleepSeconds) + "ms until get next image",
+                            op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleepSeconds));
+
 
             // Getting frames
             // Retrieve next received image and ensure image completion
@@ -323,7 +329,8 @@ public:
                 else
                 {   
 
-                    op::log("Image width " + std::to_string(imagePtr->GetWidth()) + " Image Height " + std::to_string(imagePtr->GetHeight()) + "",
+                    op::log("Image width " + std::to_string(imagePtr->GetWidth()) + " Image Height " + std::to_string(imagePtr->GetHeight()) 
+                        + " Image XPadding " + std::to_string(imagePtr->GetXPadding()) + " Image YPadding " + std::to_string(imagePtr->GetYPadding()),
                             op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
 
                     // Print image information
@@ -369,9 +376,7 @@ public:
                     // cvMats.emplace_back(pointGreyToCvMat(imagePtrs.at(i)).clone());
                     // Undistort
                     // http://docs.opencv.org/2.4/modules/imgproc/doc/geometric_transformations.html#undistort
-                    auto auxCvMat = pointGreyToCvMat(imagePtrs.at(i));
-                    imagePtrs.at(i)->Release();
-                    cvMats.emplace_back();
+                    cvMats.emplace_back(pointGreyToCvMat(imagePtrs.at(i)).clone());
                 }
             }
 
@@ -400,14 +405,17 @@ public:
             const auto cvMats = acquireImages(mCameraList);
             // Images to userDatum
             auto datatums = std::make_shared<std::vector<UserDatum>>(cvMats.size());
-            for (auto i = 0u ; i < cvMats.size() ; i++)
+            for (auto i = 0u ; i < cvMats.size() ; i++) {
+                op::log("Image width " + std::to_string(cvMats.at(i).cols) + " Image Height " + std::to_string(cvMats.at(i).rows));
                 datatums->at(i).cvInputData = cvMats.at(i);
+            }
             // Profiling speed
-            if (!cvMats.empty())
+            if (!cvMats.empty()) 
             {
                 op::Profiler::timerEnd(profilerKey);
                 op::Profiler::printAveragedTimeMsOnIterationX(profilerKey, __LINE__, __FUNCTION__, __FILE__, 100);
             }
+            op::log("Producing Pictures ...  with dataums.size()  " + std::to_string(datatums->size()));
             // Return Datum
             return datatums;
         }
@@ -449,9 +457,18 @@ public:
             // datum.poseKeypoints: Array<float> with the estimated pose
         try
         {
-            if (datumsPtr != nullptr && !datumsPtr->empty())
-                for (auto& datum : *datumsPtr)
+            if (datumsPtr != nullptr && !datumsPtr->empty()) {
+                op::log("post-processing Pictures ...  with dataums.size()  " + std::to_string(datumsPtr->size()));
+                for (auto& datum : *datumsPtr) {
+                    op::log("Bitwise picture ....");
                     cv::bitwise_not(datum.cvInputData, datum.cvOutputData);
+                    datum.cvOutputData = datum.cvInputData;
+                    op::log("Bitwise picture finished....");
+                }
+
+            }
+                
+            
         }
         catch (const std::exception& e)
         {
@@ -476,7 +493,9 @@ public:
                 // datum.cvOutputData: rendered frame with pose or heatmaps
                 // datum.poseKeypoints: Array<float> with the estimated pose
             if (datumsPtr != nullptr && !datumsPtr->empty())
-            {
+            {   
+
+                op::log("Deal with data ");
                 cv::imshow("User worker GUI", datumsPtr->at(0).cvOutputData);
                 // It displays the image and sleeps at least 1 ms (it usually sleeps ~5-10 msec to display the image)
                 cv::waitKey(1);
