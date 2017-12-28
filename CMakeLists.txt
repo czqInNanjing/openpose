@@ -82,6 +82,7 @@ option(DOWNLOAD_FACE_MODEL "Download face model." ON)
 
 # More options
 option(BUILD_EXAMPLES "Build OpenPose examples." ON)
+option(BUILD_OPENPOSE_CAMERA "Build my openpose camera module" ON)
 option(BUILD_DOCS "Build OpenPose documentation." OFF)
 
 # Build as shared library
@@ -189,6 +190,7 @@ endif (${DL_FRAMEWORK} MATCHES "CAFFE")
 # Specify the include directories
 include_directories(
   ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/openpose_camera
   ${CUDA_INCLUDE_DIRS}
   ${GFLAGS_INCLUDE_DIR}
   ${GLOG_INCLUDE_DIR}
@@ -202,6 +204,10 @@ add_subdirectory(src)
 if (BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif (BUILD_EXAMPLES)
+
+if (BUILD_OPENPOSE_CAMERA)
+  add_subdirectory(openpose_camera)
+endif(BUILD_OPENPOSE_CAMERA)
 
 ### GENERATE DOCUMENTATION
 

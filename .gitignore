@@ -127,3 +127,10 @@ html/
 
 ######################### Validation Scripts & Testing #########################
 output*/
+
+
+
+########################  ignore cmake folder and cmake debug folder ##########################
+
+cmake*/
+core
