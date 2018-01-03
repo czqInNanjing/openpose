@@ -15,12 +15,12 @@ void WOutPuter::workConsumer(const std::shared_ptr<std::vector<WMyDatum>>& datum
             // datum.poseKeypoints: Array<float> with the estimated pose
         if (datumsPtr != nullptr && !datumsPtr->empty())
         {   
+            for(auto& datum : *datumsPtr) {
 
-            op::log("Deal with data ");
-            cv::imshow("User worker GUI", datumsPtr->at(0).cvOutputData);
-            // It displays the image and sleeps at least 1 ms (it usually sleeps ~5-10 msec to display the image)
-            cv::waitKey(1);
-            op::log("Array floats of thecm datum is ");
+                cv::imshow("User worker GUI", datum.cvOutputData);
+                // It displays the image and sleeps at least 1 ms (it usually sleeps ~5-10 msec to display the image)
+                cv::waitKey(1);
+            }
         }
     }
     catch (const std::exception& e)

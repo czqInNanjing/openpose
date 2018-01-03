@@ -2,7 +2,7 @@ set(SOURCES
         openpose_producer.cpp
         postProcessing.cpp
         renderer.cpp
-        )
+        readActionStruct.cpp WPoseExtrator.cpp)
 
 add_library(openpose_camera ${SOURCES})
 

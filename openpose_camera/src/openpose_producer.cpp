@@ -1,6 +1,130 @@
 #include <openpose_camera/openpose_producer.hpp>
-WProducer::WProducer(int _runTime):
-        initialized{false}, runTime(_runTime)
+#include <SpinGenApi/SpinnakerGenApi.h>
+using namespace Spinnaker::GenApi;
+using namespace Spinnaker::GenICam;
+
+int ConfigureCustomCamera(const Spinnaker::CameraPtr &cameraPtr)
+{
+    int result = 0;
+
+    // Retrieve GenICam nodemap
+    INodeMap & nodeMap = cameraPtr->GetNodeMap();
+
+    op::log("\n\n*** CONFIGURING CUSTOM IMAGE SETTINGS ***\n\n", op::Priority::High);
+    try
+    {
+//        //
+//        // Apply mono 8 pixel format
+//        //
+//        // *** NOTES ***
+//        // Enumeration nodes are slightly more complicated to set than other
+//        // nodes. This is because setting an enumeration node requires working
+//        // with two nodes instead of the usual one.
+//        //
+//        // As such, there are a number of steps to setting an enumeration node:
+//        // retrieve the enumeration node from the nodemap, retrieve the desired
+//        // entry node from the enumeration node, retrieve the integer value from
+//        // the entry node, and set the new value of the enumeration node with
+//        // the integer value from the entry node.
+//        //
+//        // Retrieve the enumeration node from the nodemap
+//        CEnumerationPtr ptrPixelFormat = nodeMap.GetNode("PixelFormat");
+//        if (IsAvailable(ptrPixelFormat) && IsWritable(ptrPixelFormat))
+//        {
+//            // Retrieve the desired entry node from the enumeration node
+//            CEnumEntryPtr ptrPixelFormatMono8 = ptrPixelFormat->GetEntryByName("Mono8");
+//            if (IsAvailable(ptrPixelFormatMono8) && IsReadable(ptrPixelFormatMono8))
+//            {
+//                // Retrieve the integer value from the entry node
+//                int64_t pixelFormatMono8 = ptrPixelFormatMono8->GetValue();
+//
+//                // Set integer as new value for enumeration node
+//                ptrPixelFormat->SetIntValue(pixelFormatMono8);
+//
+//                op::log("Pixel format set to " + ptrPixelFormat->GetCurrentEntry()->GetSymbolic() + "...\n" , op::Priority::High);
+//            }
+//            else
+//            {
+//                op::log("Pixel format mono 8 not available...\n" , op::Priority::High);
+//            }
+//        }
+//        else
+//        {
+//            op::log("Pixel format not available...\n" , op::Priority::High);
+//        }
+
+
+        //
+        // Set maximum width
+        //
+        // *** NOTES ***
+        // Other nodes, such as those corresponding to image width and height,
+        // might have an increment other than 1. In these cases, it can be
+        // important to check that the desired value is a multiple of the
+        // increment. However, as these values are being set to the maximum,
+        // there is no reason to check against the increment.
+        //
+        CIntegerPtr ptrWidth = nodeMap.GetNode("Width");
+        if (IsAvailable(ptrWidth) && IsWritable(ptrWidth))
+        {
+            int64_t widthToSet = ptrWidth->GetMax();
+
+            ptrWidth->SetValue(widthToSet);
+
+            op::log("Width set to " + std::to_string(ptrWidth->GetValue()), op::Priority::High);
+
+        }
+        else
+        {
+            op::log("Width not available...\n" , op::Priority::High);
+        }
+
+        //
+        // Set maximum height
+        //
+        // *** NOTES ***
+        // A maximum is retrieved with the method GetMax(). A node's minimum and
+        // maximum should always be a multiple of its increment.
+        //
+        CIntegerPtr ptrHeight = nodeMap.GetNode("Height");
+        if (IsAvailable(ptrHeight) && IsWritable(ptrHeight))
+        {
+            int64_t heightToSet = ptrHeight->GetMax();
+
+            ptrHeight->SetValue(heightToSet);
+
+            op::log("Height set to " + std::to_string(ptrHeight->GetValue()), op::Priority::High);
+        }
+        else
+        {
+            op::log("Height not available...\n" , op::Priority::High);
+        }
+
+
+        // Remove buffer --> Always get newest frame
+        Spinnaker::GenApi::INodeMap& snodeMap = cameraPtr->GetTLStreamNodeMap();
+        Spinnaker::GenApi::CEnumerationPtr ptrBufferHandlingMode = snodeMap.GetNode("StreamBufferHandlingMode");
+        if (!Spinnaker::GenApi::IsAvailable(ptrBufferHandlingMode) || !Spinnaker::GenApi::IsWritable(ptrBufferHandlingMode))
+            op::error("Unable to change buffer handling mode", __LINE__, __FUNCTION__, __FILE__);
+
+        Spinnaker::GenApi::CEnumEntryPtr ptrBufferHandlingModeNewest = ptrBufferHandlingMode->GetEntryByName("NewestFirstOverwrite");
+        if (!Spinnaker::GenApi::IsAvailable(ptrBufferHandlingModeNewest) || !IsReadable(ptrBufferHandlingModeNewest))
+            op::error("Unable to set buffer handling mode to newest (entry 'NewestFirstOverwrite' retrieval). Aborting...", __LINE__, __FUNCTION__, __FILE__);
+        int64_t bufferHandlingModeNewest = ptrBufferHandlingModeNewest->GetValue();
+
+        ptrBufferHandlingMode->SetIntValue(bufferHandlingModeNewest);
+    }
+    catch (Spinnaker::Exception &e)
+    {
+        op::error(e.what(), __LINE__, __FUNCTION__, __FILE__);
+        result = -1;
+    }
+
+    return result;
+}
+
+WProducer::WProducer(int _runTime, int __millSecondsBetweenImage):
+        initialized{false}, runTime(_runTime), millSecondsBetweenImage(__millSecondsBetweenImage)
 {
 }
 
@@ -135,26 +259,12 @@ void WProducer::initializationOnThread()
             auto cameraPtr = mCameraList.GetByIndex(i);
 
             // Initialize each camera
-            // You may notice that the steps in this function have more loops with
-            // less steps per loop; this contrasts the acquireImages() function
-            // which has less loops but more steps per loop. This is done for
-            // demonstrative purposes as both work equally well.
-            // Later: Each camera needs to be deinitialized once all images have been
-            // acquired.
             cameraPtr->Init();
 
-            // Remove buffer --> Always get newest frame
-            Spinnaker::GenApi::INodeMap& snodeMap = cameraPtr->GetTLStreamNodeMap();
-            Spinnaker::GenApi::CEnumerationPtr ptrBufferHandlingMode = snodeMap.GetNode("StreamBufferHandlingMode");
-            if (!Spinnaker::GenApi::IsAvailable(ptrBufferHandlingMode) || !Spinnaker::GenApi::IsWritable(ptrBufferHandlingMode))
-                op::error("Unable to change buffer handling mode", __LINE__, __FUNCTION__, __FILE__);
+            // Configure custom image settings
+            ConfigureCustomCamera(cameraPtr);
 
-            Spinnaker::GenApi::CEnumEntryPtr ptrBufferHandlingModeNewest = ptrBufferHandlingMode->GetEntryByName("NewestFirstOverwrite");
-            if (!Spinnaker::GenApi::IsAvailable(ptrBufferHandlingModeNewest) || !IsReadable(ptrBufferHandlingModeNewest))
-                op::error("Unable to set buffer handling mode to newest (entry 'NewestFirstOverwrite' retrieval). Aborting...", __LINE__, __FUNCTION__, __FILE__);
-            int64_t bufferHandlingModeNewest = ptrBufferHandlingModeNewest->GetValue();
 
-            ptrBufferHandlingMode->SetIntValue(bufferHandlingModeNewest);
         }
 
         // Prepare each camera to acquire images
@@ -234,8 +344,13 @@ cv::Mat pointGreyToCvMat(const Spinnaker::ImagePtr &imagePtr)
         const auto rowsize = imagePtr->GetWidth();
         const auto colsize = imagePtr->GetHeight();
 
+        // reduce the image size
+        cv::Mat result((int)(colsize + YPadding), (int)(rowsize + XPadding), CV_8UC3, imagePtr->GetData(), imagePtr->GetStride());
+        cv::Size size(512, 512);
+        cv::Mat resizedResult(size, CV_8UC3);
+        cv::resize(result, resizedResult, size);
         // image data contains padding. When allocating cv::Mat container size, you need to account for the X,Y image data padding.
-        return cv::Mat((int)(colsize + YPadding), (int)(rowsize + XPadding), CV_8UC3, imagePtr->GetData(), imagePtr->GetStride());
+        return resizedResult;
     }
     catch (const std::exception& e)
     {
@@ -243,6 +358,10 @@ cv::Mat pointGreyToCvMat(const Spinnaker::ImagePtr &imagePtr)
         return cv::Mat();
     }
 }
+
+
+
+
 
 // This function acquires and displays images from each device.
 std::vector<cv::Mat> acquireImages(Spinnaker::CameraList &cameraList)
@@ -263,13 +382,6 @@ std::vector<cv::Mat> acquireImages(Spinnaker::CameraList &cameraList)
             cameraPtrs.at(i) = cameraList.GetByIndex(i);
 
         std::vector<Spinnaker::ImagePtr> imagePtrs(cameraPtrs.size());
-
-
-        auto sleepSeconds = 100;
-        op::log("Sleep for "+ std::to_string(sleepSeconds) + "ms until get next image",
-                op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleepSeconds));
-
 
         // Getting frames
         // Retrieve next received image and ensure image completion
@@ -300,9 +412,9 @@ std::vector<cv::Mat> acquireImages(Spinnaker::CameraList &cameraList)
             else
             {
 
-                op::log("Image width " + std::to_string(imagePtr->GetWidth()) + " Image Height " + std::to_string(imagePtr->GetHeight())
+                op::log("Successfully get one image with width " + std::to_string(imagePtr->GetWidth()) + " Image Height " + std::to_string(imagePtr->GetHeight())
                         + " Image XPadding " + std::to_string(imagePtr->GetXPadding()) + " Image YPadding " + std::to_string(imagePtr->GetYPadding()),
-                        op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
+                        op::Priority::Low, __LINE__, __FUNCTION__, __FILE__);
 
                 // Print image information
                 // Convert image to RGB
@@ -379,7 +491,7 @@ std::shared_ptr<std::vector<WMyDatum>> WProducer::workProducer()
 
         if(totalTimeSec > runTime) {
             this->stop();
-            op::log("Stop Producer due to time " + std::to_string(totalTimeSec), op::Priority::High);
+            op::log("Stop Producer due to time ends with total time: " + std::to_string(totalTimeSec), op::Priority::Max);
             return nullptr;
         }
 
@@ -387,6 +499,13 @@ std::shared_ptr<std::vector<WMyDatum>> WProducer::workProducer()
         const auto profilerKey = op::Profiler::timerInit(__LINE__, __FUNCTION__, __FILE__);
         // Get image from each camera
         const auto cvMats = acquireImages(mCameraList);
+
+        auto sleepSeconds = 100;
+        op::log("Sleep for "+ std::to_string(sleepSeconds) + "ms until get next image",
+                op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleepSeconds));
+
+
         // Images to userDatum
         auto datatums = std::make_shared<std::vector<WMyDatum>>(cvMats.size());
         for (auto i = 0u ; i < cvMats.size() ; i++) {

@@ -9,3 +9,4 @@ add_executable(${SOURCE_NAME}.bin openpose_camera.cpp)
 target_link_libraries( ${SOURCE_NAME}.bin
      openpose openpose_camera ${GLOG_LIBRARY} ${GFLAGS_LIBRARY} ${Caffe_LIBS}  ${MY_SPINNAKER_LIBRARIES}
 )
+

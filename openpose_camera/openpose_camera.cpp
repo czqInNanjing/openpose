@@ -14,11 +14,10 @@
 // OpenPose dependencies
 #include <openpose/headers.hpp>
 #include <openpose_camera/headers.hpp>
+#include "src/readActionStruct.cpp"
+#include "openpose_camera/WPoseExtrator.hpp"
+using namespace std;
 
-// See all the available parameter options withe the `--help` flag. E.g. `build/examples/openpose/openpose.bin --help`
-// Note: This command will show you flags for other unnecessary 3rdparty files. Check only the flags for the OpenPose
-// executable. E.g. for `openpose.bin`, look for `Flags from examples/openpose/openpose.cpp:`.
-// Debugging/Other
 DEFINE_int32(logging_level,             3,              "The logging level. Integer in the range [0, 255]. 0 will output any log() message, while"
                                                         " 255 will not output any. Current OpenPose library messages are in the range 0-4: 1 for"
                                                         " low priority messages and 4 for important ones.");
@@ -102,25 +101,38 @@ DEFINE_string(write_heatmaps,           "",             "Directory to write body
 DEFINE_string(write_heatmaps_format,    "png",          "File extension and format for `write_heatmaps`, analogous to `write_images_format`."
                                                         " For lossless compression, recommended `png` for integer `heatmaps_scale` and `float` for"
                                                         " floating values.");                                                     
-DEFINE_int32(run_time,                  100,             "Longest time to produce picture, when time exceeds, producer will stop");                         
-// Display
-DEFINE_bool(fullscreen,                 false,          "Run in full-screen mode (press f during runtime to toggle).");
-DEFINE_bool(no_gui_verbose,             false,          "Do not write text on output images on GUI (e.g. number of current frame and people). It"
-                                                        " does not affect the pose rendering.");
-DEFINE_bool(no_display,                 true,          "Do not open a display window. Useful if there is no X server and/or to slightly speed up"
-                                                        " the processing if visual output is not required.");
 
 
+// Producer
+DEFINE_int32(camera,                    -1,             "The camera index for cv::VideoCapture. Integer in the range [0, 9]. Select a negative"
+                                                        " number (by default), to auto-detect and open the first available camera.");
+DEFINE_string(camera_resolution,        "1280x720",     "Size of the camera frames to ask for.");
+DEFINE_double(camera_fps,               30.0,           "Frame rate for the webcam (only used when saving video from webcam). Set this value to the"
+                                                        " minimum value between the OpenPose displayed speed and the webcam real frame rate.");
+DEFINE_string(video,                    "",             "Use a video file instead of the camera. Use `examples/media/video.avi` for our default"
+                                                        " example video.");
+DEFINE_string(image_dir,                "",             "Process a directory of images. Use `examples/media/` for our default example folder with 20"
+                                                        " images. Read all standard formats (jpg, png, bmp, etc.).");
+DEFINE_string(ip_camera,                "",             "String with the IP camera URL. It supports protocols like RTSP and HTTP.");
+DEFINE_uint64(frame_first,              0,              "Start on desired frame number. Indexes are 0-based, i.e. the first frame has index 0.");
+DEFINE_uint64(frame_last,               -1,             "Finish on desired frame number. Select -1 to disable. Indexes are 0-based, e.g. if set to"
+                                                        " 10, it will process 11 frames (0-10).");
+DEFINE_bool(frame_flip,                 false,          "Flip/mirror each frame (e.g. for real time webcam demonstrations).");
+DEFINE_int32(frame_rotate,              0,              "Rotate each frame, 4 possible values: 0, 90, 180, 270.");
+DEFINE_bool(frames_repeat,              false,          "Repeat frames when finished.");
+DEFINE_bool(process_real_time,          false,          "Enable to keep the original source frame rate (e.g. for video). If the processing time is"
+                                                        " too long, it will skip frames. If it is too fast, it will slow it down.");
 
+// Personal parameters
+DEFINE_bool(use_camera,                 false,          "If true, set FLIR camera as producer");
+DEFINE_int32(run_time,                  100,            "Longest time to produce picture, when time exceeds, producer will stop");
 
-
-int openPoseTutorialThread4()
+int default_main()
 {
     // logging_level
     op::check(0 <= FLAGS_logging_level && FLAGS_logging_level <= 255, "Wrong logging_level value.",
               __LINE__, __FUNCTION__, __FILE__);
     op::ConfigureLog::setPriorityThreshold((op::Priority)FLAGS_logging_level);
-    // op::ConfigureLog::setPriorityThreshold(op::Priority::None); // To print all logging messages
 
     op::log("Starting pose estimation demo.", op::Priority::High);
     const auto timerBegin = std::chrono::high_resolution_clock::now();
@@ -147,22 +159,21 @@ int openPoseTutorialThread4()
 
     // Initializing the user custom classes
     // Frames producer (e.g. video, webcam, ...)
-    auto wUserInput = std::make_shared<WProducer>(FLAGS_run_time);
+    auto wUserInput = std::make_shared<WProducer>(FLAGS_run_time, 100);
     // Processing
     auto wUserPostProcessing = std::make_shared<WPostProcessing>();
     // GUI (Display)
     auto wUserOutput = std::make_shared<WOutPuter>();
 
     op::Wrapper<std::vector<WMyDatum>> opWrapper;
-    // Add custom input
-    const auto workerInputOnNewThread = true;
-    opWrapper.setWorkerInput(wUserInput, workerInputOnNewThread);
+
     // Add custom processing
     const auto workerProcessingOnNewThread = true;
     opWrapper.setWorkerPostProcessing(wUserPostProcessing, workerProcessingOnNewThread);
     // Add custom output
     const auto workerOutputOnNewThread = true;
     opWrapper.setWorkerOutput(wUserOutput, workerOutputOnNewThread);
+
     // Configure OpenPose
     const op::WrapperStructPose wrapperStructPose{!FLAGS_body_disable, netInputSize, outputSize, keypointScale,
                                                   FLAGS_num_gpu, FLAGS_num_gpu_start, FLAGS_scale_number,
@@ -171,14 +182,38 @@ int openPoseTutorialThread4()
                                                   (float)FLAGS_alpha_heatmap, FLAGS_part_to_show, FLAGS_model_folder,
                                                   heatMapTypes, heatMapScale, (float)FLAGS_render_threshold,
                                                   enableGoogleLogging};
-
-
-    const op::WrapperStructOutput wrapperStructOutput{!FLAGS_no_display, !FLAGS_no_gui_verbose, FLAGS_fullscreen, FLAGS_write_keypoint,
+    // never use default display
+    // instead, use our renderer to display if we want
+    const bool displayGui = false;
+    const bool guiVerbose = true;
+    const bool fullScreen = false;
+    const op::WrapperStructOutput wrapperStructOutput{displayGui, guiVerbose, fullScreen, FLAGS_write_keypoint,
                                                       op::stringToDataFormat(FLAGS_write_keypoint_format), FLAGS_write_keypoint_json,
                                                       FLAGS_write_coco_json, FLAGS_write_images, FLAGS_write_images_format, FLAGS_write_video,
                                                       FLAGS_write_heatmaps, FLAGS_write_heatmaps_format};
+
+    // which input source to use
+    op::WrapperStructInput wrapperStructInput{};
+    if(FLAGS_use_camera) {
+        const auto workerInputOnNewThread = true;
+        opWrapper.setWorkerInput(wUserInput, workerInputOnNewThread);
+    } else {
+        // Or use default input
+        // producerType
+        const auto producerSharedPtr = op::flagsToProducer(FLAGS_image_dir, FLAGS_video, FLAGS_ip_camera, FLAGS_camera,
+                                                           FLAGS_camera_resolution, FLAGS_camera_fps);
+        // Producer (use default to disable any input)
+        wrapperStructInput = op::WrapperStructInput{producerSharedPtr, FLAGS_frame_first, FLAGS_frame_last,
+                                                        FLAGS_process_real_time, FLAGS_frame_flip, FLAGS_frame_rotate,
+                                                        FLAGS_frames_repeat};
+    }
+
+
+
+
+
     // Configure wrapper
-    opWrapper.configure(wrapperStructPose, op::WrapperStructFace{}, op::WrapperStructHand{}, op::WrapperStructInput{},
+    opWrapper.configure(wrapperStructPose, op::WrapperStructFace{}, op::WrapperStructHand{}, wrapperStructInput,
                         wrapperStructOutput);
     // Set to single-thread running (to debug and/or reduce latency)
     if (FLAGS_disable_multi_thread)
@@ -199,11 +234,103 @@ int openPoseTutorialThread4()
     return 0;
 }
 
+int get_train_data(const string videoPath, vector<ActionStruct> & actionParts)
+{
+    // change video file
+    FLAGS_video = videoPath;
+    // Processing
+    auto wUserPostProcessing = std::make_shared<WPoseExtrator>(actionParts);
+
+    op::ConfigureLog::setPriorityThreshold((op::Priority)FLAGS_logging_level);
+
+    op::log("Starting acquire train data from video", op::Priority::High);
+    const auto timerBegin = std::chrono::high_resolution_clock::now();
+
+
+    const auto outputSize = op::flagsToPoint(FLAGS_output_resolution, "-1x-1");
+    const auto netInputSize = op::flagsToPoint(FLAGS_net_resolution, "-1x368");
+    const auto poseModel = op::flagsToPoseModel(FLAGS_model_pose);
+    const auto keypointScale = op::flagsToScaleMode(FLAGS_keypoint_scale);
+    const auto heatMapTypes = op::flagsToHeatMaps(FLAGS_heatmaps_add_parts, FLAGS_heatmaps_add_bkg,
+                                                  FLAGS_heatmaps_add_PAFs);
+    const auto heatMapScale = op::flagsToHeatMapScaleMode(FLAGS_heatmaps_scale);
+    const bool enableGoogleLogging = true;
+
+
+
+    op::Wrapper<std::vector<WMyDatum>> opWrapper;
+
+    // Add custom processing
+    const auto workerProcessingOnNewThread = true;
+    opWrapper.setWorkerPostProcessing(wUserPostProcessing, workerProcessingOnNewThread);
+
+    // Configure OpenPose
+    const op::WrapperStructPose wrapperStructPose{!FLAGS_body_disable, netInputSize, outputSize, keypointScale,
+                                                  FLAGS_num_gpu, FLAGS_num_gpu_start, FLAGS_scale_number,
+                                                  (float)FLAGS_scale_gap, op::flagsToRenderMode(FLAGS_render_pose),
+                                                  poseModel, !FLAGS_disable_blending, (float)FLAGS_alpha_pose,
+                                                  (float)FLAGS_alpha_heatmap, FLAGS_part_to_show, FLAGS_model_folder,
+                                                  heatMapTypes, heatMapScale, (float)FLAGS_render_threshold,
+                                                  enableGoogleLogging};
+    // do not display
+    const bool displayGui = false;
+    const bool guiVerbose = true;
+    const bool fullScreen = false;
+    const op::WrapperStructOutput wrapperStructOutput{displayGui, guiVerbose, fullScreen, FLAGS_write_keypoint,
+                                                      op::stringToDataFormat(FLAGS_write_keypoint_format), FLAGS_write_keypoint_json,
+                                                      FLAGS_write_coco_json, FLAGS_write_images, FLAGS_write_images_format, FLAGS_write_video,
+                                                      FLAGS_write_heatmaps, FLAGS_write_heatmaps_format};
+
+
+    const auto producerSharedPtr = op::flagsToProducer(FLAGS_image_dir, FLAGS_video, FLAGS_ip_camera, FLAGS_camera,
+                                                           FLAGS_camera_resolution, FLAGS_camera_fps);
+
+    const op::WrapperStructInput  wrapperStructInput{producerSharedPtr, FLAGS_frame_first, FLAGS_frame_last,
+                                                    FLAGS_process_real_time, FLAGS_frame_flip, FLAGS_frame_rotate,
+                                                    FLAGS_frames_repeat};
+    opWrapper.configure(wrapperStructPose, op::WrapperStructFace{}, op::WrapperStructHand{}, wrapperStructInput,
+                        wrapperStructOutput);
+    // Set to single-thread running (to debug and/or reduce latency)
+    if (FLAGS_disable_multi_thread)
+        opWrapper.disableMultiThreading();
+
+    op::log("Starting thread(s)", op::Priority::Max);
+    // Start, run & stop threads
+    opWrapper.exec();  // It blocks this thread until all threads have finished
+
+    // Measuring total time
+    const auto now = std::chrono::high_resolution_clock::now();
+    const auto totalTimeSec = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(now-timerBegin).count()
+                              * 1e-9;
+    const auto message = "Real-time pose estimation demo successfully finished. Total time: "
+                         + std::to_string(totalTimeSec) + " seconds.";
+    op::log(message, op::Priority::High);
+
+    return 0;
+}
+
+
+int parseVideoToAxisFile(Dataset& dataset, const string& videoFolderPath)
+{
+    int result = 0;
+    for(auto& pair : dataset.videos2actions) {
+        // find if the video exist
+        string fullVideoPath = videoFolderPath + "/" + pair.second + "/" + pair.first + "_uncomp.avi";
+        std::ifstream infile(fullVideoPath);
+        if(infile.good()){
+            result |= get_train_data(fullVideoPath, dataset.datas[pair.first]);
+        }
+    }
+    return result;
+}
+
+
+
 int main(int argc, char *argv[])
 {
     // Parsing command line flags
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-
-    // Running openPoseTutorialThread4
-    return openPoseTutorialThread4();
+    Dataset dateset = readActionsFromFile("data/00sequences.txt");
+    // Running default_main_method
+    return parseVideoToAxisFile(dateset, "/home/fyf/Desktop/dataset");
 }
