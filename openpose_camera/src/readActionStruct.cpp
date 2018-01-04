@@ -10,6 +10,7 @@ Dataset readActionsFromFile(string filepath)
 
     while (std::getline(infile, line))
     {
+        if(line.find("frames") == line.npos) continue;
         string actionName = line.substr(line.find('_') + 1, line.rfind('_') - line.find('_') - 1);
         string videoName = line.substr(0, line.find('\t'));
         vector<ActionStruct> actions;

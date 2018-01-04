@@ -10,6 +10,17 @@
 #include <openpose_camera/myDatum.hpp>
 #include "openpose_camera/Dataset.hpp"
 
+
+
+
+struct OneActionAxis {
+    vector<vector<float>> x;
+    vector<vector<float>> y;
+    OneActionAxis() = default;
+};
+
+
+
 class WPoseExtrator : public op::Worker<std::shared_ptr<std::vector<WMyDatum>>>
 {
 public:
@@ -23,6 +34,9 @@ public:
 
 private:
     const std::vector<ActionStruct>& dataset;
+    int currentFrame = 0;
+    int currentPart = 0;
+    OneActionAxis oneActionAxis;
 };
 
 

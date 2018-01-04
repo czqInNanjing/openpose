@@ -1,8 +1,24 @@
 //
-// Created by fyf on 18-1-3.
+// Created by Qiang on 18-1-3.
 //
 
 #include "openpose_camera/WPoseExtrator.hpp"
+#include <fstream>
+
+void writeToFile(string actionName, OneActionAxis axis) {
+    fstream fout("data/action/" + actionName + ".txt", fstream::app);
+    fout << "Num of frames: " <<  axis.x.size() << std::endl;
+    for (int i = 0; i < axis.x.size(); ++i) {
+        for (int j = 0; j < axis.x[i].size(); ++j) {
+            fout << axis.x[i][j] << "," << axis.y[i][j] << " ";
+        }
+        fout << std::endl;
+    }
+    fout.flush();
+    fout.close();
+    std::cout << "Write one file of " << actionName << std::endl;
+}
+
 
 
 void WPoseExtrator::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
@@ -10,21 +26,32 @@ void WPoseExtrator::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
     try {
         if (datumsPtr != nullptr && !datumsPtr->empty()) {
             for (auto &datum : *datumsPtr) {
+                currentFrame++;
+                if(currentPart >= dataset.size()) return;
 
-
-                std::vector<int> dimensionSize = datum.poseKeypoints.getSize();
-                std::cout << " Person number " << dimensionSize[0] << " Body parts Num " << dimensionSize[1]
-                          << std::endl;
-                for (int i = 0; i < dimensionSize[0]; ++i) {
-                    for (int j = 0; j < dimensionSize[1]; ++j) {
-                        std::vector<int> v1 = {i, j, 0};
-                        std::vector<int> v2 = {i, j, 1};
-                        std::cout << " Part" << j << " with x " << datum.poseKeypoints.at(v1) << "with y "
-                                  << datum.poseKeypoints.at(v2) << std::endl;
-                    }
+                if(dataset[currentPart].startFrame == currentFrame) {
+                    oneActionAxis = OneActionAxis();
                 }
 
+                std::vector<int> dimensionSize = datum.poseKeypoints.getSize();
+                for (int i = 0; i < dimensionSize[0]; ++i) {              // nums of people detected, 0 or 1 in KTH set
+                    vector<float> x;
+                    vector<float> y;
+                    for (int j = 0; j < dimensionSize[1]; ++j) {          // 18 for COCO
+                        std::vector<int> v1 = {i, j, 0};
+                        std::vector<int> v2 = {i, j, 1};
+                        x.emplace_back(datum.poseKeypoints.at(v1));
+                        y.emplace_back(datum.poseKeypoints.at(v2));
+                    }
+                    oneActionAxis.x.push_back(x);
+                    oneActionAxis.y.push_back(y);
+                }
 
+                if(dataset[currentPart].endFrame == currentFrame) {
+                    writeToFile(dataset[currentPart].type, oneActionAxis);
+                    std::cout << "Finish one part " << currentPart << std::endl;
+                    currentPart++;
+                }
             }
         }
     }

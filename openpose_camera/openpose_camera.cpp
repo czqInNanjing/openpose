@@ -236,12 +236,14 @@ int default_main()
 
 int get_train_data(const string videoPath, vector<ActionStruct> & actionParts)
 {
+    op::log("Dealing with file " + videoPath, op::Priority::High);
     // change video file
     FLAGS_video = videoPath;
     // Processing
     auto wUserPostProcessing = std::make_shared<WPoseExtrator>(actionParts);
+    // GUI (Display)
+    auto wUserOutput = std::make_shared<WOutPuter>();
 
-    op::ConfigureLog::setPriorityThreshold((op::Priority)FLAGS_logging_level);
 
     op::log("Starting acquire train data from video", op::Priority::High);
     const auto timerBegin = std::chrono::high_resolution_clock::now();
@@ -263,6 +265,9 @@ int get_train_data(const string videoPath, vector<ActionStruct> & actionParts)
     // Add custom processing
     const auto workerProcessingOnNewThread = true;
     opWrapper.setWorkerPostProcessing(wUserPostProcessing, workerProcessingOnNewThread);
+    // Add custom output
+    const auto workerOutputOnNewThread = true;
+    opWrapper.setWorkerOutput(wUserOutput, workerOutputOnNewThread);
 
     // Configure OpenPose
     const op::WrapperStructPose wrapperStructPose{!FLAGS_body_disable, netInputSize, outputSize, keypointScale,
@@ -313,13 +318,23 @@ int get_train_data(const string videoPath, vector<ActionStruct> & actionParts)
 int parseVideoToAxisFile(Dataset& dataset, const string& videoFolderPath)
 {
     int result = 0;
+    int cnt = 0;
+    const auto timerBegin = std::chrono::high_resolution_clock::now();
     for(auto& pair : dataset.videos2actions) {
         // find if the video exist
+        auto dealWithOneVideo = std::chrono::high_resolution_clock::now();
         string fullVideoPath = videoFolderPath + "/" + pair.second + "/" + pair.first + "_uncomp.avi";
         std::ifstream infile(fullVideoPath);
         if(infile.good()){
             result |= get_train_data(fullVideoPath, dataset.datas[pair.first]);
         }
+        cnt++;
+        const auto now = std::chrono::high_resolution_clock::now();
+        const auto oneVideoTime = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(now-dealWithOneVideo).count()
+                                  * 1e-9;
+        const auto totalTimeSec = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(now-timerBegin).count()
+                                  * 1e-9;
+        std::cout << "Finish " << cnt << " of " << dataset.videos2actions.size() << "with time " << oneVideoTime << "and total time" << totalTimeSec << std::endl;
     }
     return result;
 }
@@ -332,5 +347,5 @@ int main(int argc, char *argv[])
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     Dataset dateset = readActionsFromFile("data/00sequences.txt");
     // Running default_main_method
-    return parseVideoToAxisFile(dateset, "/home/fyf/Desktop/dataset");
+    return parseVideoToAxisFile(dateset, "/home/fyf/Desktop/dataset/KTH");
 }
