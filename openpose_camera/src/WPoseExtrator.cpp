@@ -16,7 +16,6 @@ void writeToFile(string actionName, OneActionAxis axis) {
     }
     fout.flush();
     fout.close();
-    std::cout << "Write one file of " << actionName << std::endl;
 }
 
 
@@ -30,22 +29,26 @@ void WPoseExtrator::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
                 if(currentPart >= dataset.size()) return;
 
                 if(dataset[currentPart].startFrame == currentFrame) {
+                    std::cout << "Start one part " << currentPart << std::endl;
                     oneActionAxis = OneActionAxis();
                 }
 
                 std::vector<int> dimensionSize = datum.poseKeypoints.getSize();
-                for (int i = 0; i < dimensionSize[0]; ++i) {              // nums of people detected, 0 or 1 in KTH set
-                    vector<float> x;
-                    vector<float> y;
-                    for (int j = 0; j < dimensionSize[1]; ++j) {          // 18 for COCO
-                        std::vector<int> v1 = {i, j, 0};
-                        std::vector<int> v2 = {i, j, 1};
-                        x.emplace_back(datum.poseKeypoints.at(v1));
-                        y.emplace_back(datum.poseKeypoints.at(v2));
+                if(!dimensionSize.empty()) {
+                    for (int i = 0; i < dimensionSize[0]; ++i) {              // nums of people detected, 0 or 1 in KTH set
+                        vector<float> x;
+                        vector<float> y;
+                        for (int j = 0; j < dimensionSize[1]; ++j) {          // 18 for COCO
+                            std::vector<int> v1 = {i, j, 0};
+                            std::vector<int> v2 = {i, j, 1};
+                            x.emplace_back(datum.poseKeypoints.at(v1));
+                            y.emplace_back(datum.poseKeypoints.at(v2));
+                        }
+                        oneActionAxis.x.push_back(x);
+                        oneActionAxis.y.push_back(y);
                     }
-                    oneActionAxis.x.push_back(x);
-                    oneActionAxis.y.push_back(y);
                 }
+
 
                 if(dataset[currentPart].endFrame == currentFrame) {
                     writeToFile(dataset[currentPart].type, oneActionAxis);

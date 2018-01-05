@@ -303,13 +303,7 @@ int get_train_data(const string videoPath, vector<ActionStruct> & actionParts)
     // Start, run & stop threads
     opWrapper.exec();  // It blocks this thread until all threads have finished
 
-    // Measuring total time
-    const auto now = std::chrono::high_resolution_clock::now();
-    const auto totalTimeSec = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(now-timerBegin).count()
-                              * 1e-9;
-    const auto message = "Real-time pose estimation demo successfully finished. Total time: "
-                         + std::to_string(totalTimeSec) + " seconds.";
-    op::log(message, op::Priority::High);
+
 
     return 0;
 }
@@ -323,18 +317,30 @@ int parseVideoToAxisFile(Dataset& dataset, const string& videoFolderPath)
     for(auto& pair : dataset.videos2actions) {
         // find if the video exist
         auto dealWithOneVideo = std::chrono::high_resolution_clock::now();
+
+        // Jump the handwaving
+        if(pair.second == "handwaving") continue;
+
         string fullVideoPath = videoFolderPath + "/" + pair.second + "/" + pair.first + "_uncomp.avi";
         std::ifstream infile(fullVideoPath);
         if(infile.good()){
             result |= get_train_data(fullVideoPath, dataset.datas[pair.first]);
+            fstream fout("data/finished.txt", fstream::app);
+            fout << fullVideoPath << std::endl;
+            fout.flush();
+            fout.close();
+            cnt++;
+            const auto now = std::chrono::high_resolution_clock::now();
+            const auto oneVideoTime = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(now-dealWithOneVideo).count()
+                                      * 1e-9;
+            const auto totalTimeSec = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(now-timerBegin).count()
+                                      * 1e-9;
+            std::cout << "Finish " << cnt << " of " << dataset.videos2actions.size() << "with time " << oneVideoTime << "and total time" << totalTimeSec << std::endl;
+        } else {
+            std::cout << "File " << fullVideoPath << " cannot be found! " << std::endl;
         }
-        cnt++;
-        const auto now = std::chrono::high_resolution_clock::now();
-        const auto oneVideoTime = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(now-dealWithOneVideo).count()
-                                  * 1e-9;
-        const auto totalTimeSec = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(now-timerBegin).count()
-                                  * 1e-9;
-        std::cout << "Finish " << cnt << " of " << dataset.videos2actions.size() << "with time " << oneVideoTime << "and total time" << totalTimeSec << std::endl;
+
+
     }
     return result;
 }
