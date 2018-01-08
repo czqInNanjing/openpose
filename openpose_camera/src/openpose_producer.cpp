@@ -13,21 +13,21 @@ int ConfigureCustomCamera(const Spinnaker::CameraPtr &cameraPtr)
     op::log("\n\n*** CONFIGURING CUSTOM IMAGE SETTINGS ***\n\n", op::Priority::High);
     try
     {
-//        //
-//        // Apply mono 8 pixel format
-//        //
-//        // *** NOTES ***
-//        // Enumeration nodes are slightly more complicated to set than other
-//        // nodes. This is because setting an enumeration node requires working
-//        // with two nodes instead of the usual one.
-//        //
-//        // As such, there are a number of steps to setting an enumeration node:
-//        // retrieve the enumeration node from the nodemap, retrieve the desired
-//        // entry node from the enumeration node, retrieve the integer value from
-//        // the entry node, and set the new value of the enumeration node with
-//        // the integer value from the entry node.
-//        //
-//        // Retrieve the enumeration node from the nodemap
+        //
+        // Apply mono 8 pixel format
+        //
+        // *** NOTES ***
+        // Enumeration nodes are slightly more complicated to set than other
+        // nodes. This is because setting an enumeration node requires working
+        // with two nodes instead of the usual one.
+        //
+        // As such, there are a number of steps to setting an enumeration node:
+        // retrieve the enumeration node from the nodemap, retrieve the desired
+        // entry node from the enumeration node, retrieve the integer value from
+        // the entry node, and set the new value of the enumeration node with
+        // the integer value from the entry node.
+        //
+        // Retrieve the enumeration node from the nodemap
 //        CEnumerationPtr ptrPixelFormat = nodeMap.GetNode("PixelFormat");
 //        if (IsAvailable(ptrPixelFormat) && IsWritable(ptrPixelFormat))
 //        {
@@ -346,7 +346,7 @@ cv::Mat pointGreyToCvMat(const Spinnaker::ImagePtr &imagePtr)
 
         // reduce the image size
         cv::Mat result((int)(colsize + YPadding), (int)(rowsize + XPadding), CV_8UC3, imagePtr->GetData(), imagePtr->GetStride());
-        cv::Size size(512, 512);
+        cv::Size size(400, 400);
         cv::Mat resizedResult(size, CV_8UC3);
         cv::resize(result, resizedResult, size);
         // image data contains padding. When allocating cv::Mat container size, you need to account for the X,Y image data padding.
@@ -501,8 +501,8 @@ std::shared_ptr<std::vector<WMyDatum>> WProducer::workProducer()
         const auto cvMats = acquireImages(mCameraList);
 
         auto sleepSeconds = 100;
-        op::log("Sleep for "+ std::to_string(sleepSeconds) + "ms until get next image",
-                op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
+//        op::log("Sleep for "+ std::to_string(sleepSeconds) + "ms until get next image",
+//                op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
         std::this_thread::sleep_for(std::chrono::milliseconds(sleepSeconds));
 
 

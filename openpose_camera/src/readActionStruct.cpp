@@ -12,6 +12,7 @@ Dataset readActionsFromFile(string filepath)
     {
         if(line.find("frames") == line.npos) continue;
         string actionName = line.substr(line.find('_') + 1, line.rfind('_') - line.find('_') - 1);
+        // TODO some video name does not end with \t and cause some video lost
         string videoName = line.substr(0, line.find('\t'));
         vector<ActionStruct> actions;
         line = line.substr(line.find("frames") + 6);

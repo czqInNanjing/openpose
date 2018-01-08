@@ -124,7 +124,7 @@ DEFINE_bool(process_real_time,          false,          "Enable to keep the orig
                                                         " too long, it will skip frames. If it is too fast, it will slow it down.");
 
 // Personal parameters
-DEFINE_bool(use_camera,                 false,          "If true, set FLIR camera as producer");
+DEFINE_bool(use_camera, false,          "If true, set FLIR camera as producer");
 DEFINE_int32(run_time,                  100,            "Longest time to produce picture, when time exceeds, producer will stop");
 
 int default_main()
@@ -166,6 +166,7 @@ int default_main()
     auto wUserOutput = std::make_shared<WOutPuter>();
 
     op::Wrapper<std::vector<WMyDatum>> opWrapper;
+
 
     // Add custom processing
     const auto workerProcessingOnNewThread = true;
@@ -320,6 +321,10 @@ int parseVideoToAxisFile(Dataset& dataset, const string& videoFolderPath)
 
         // Jump the handwaving
         if(pair.second == "handwaving") continue;
+        if(pair.second == "boxing") continue;
+        if(pair.second == "handclapping") continue;
+        if(pair.second == "jogging") continue;
+        if(pair.second == "walking") continue;
 
         string fullVideoPath = videoFolderPath + "/" + pair.second + "/" + pair.first + "_uncomp.avi";
         std::ifstream infile(fullVideoPath);
@@ -351,7 +356,8 @@ int main(int argc, char *argv[])
 {
     // Parsing command line flags
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    Dataset dateset = readActionsFromFile("data/00sequences.txt");
-    // Running default_main_method
-    return parseVideoToAxisFile(dateset, "/home/fyf/Desktop/dataset/KTH");
+//    Dataset dateset = readActionsFromFile("data/00sequences.txt");
+//    // Running default_main_method
+//    return parseVideoToAxisFile(dateset, "/home/fyf/Desktop/dataset/KTH");
+    return default_main();
 }
