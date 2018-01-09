@@ -1,5 +1,12 @@
 #include <openpose_camera/headers.hpp>
 #include <sstream>
+#include <chrono>
+#include <cstdio> // std::snprintf
+#include <limits> // std::numeric_limits
+#include <openpose/utilities/fastMath.hpp>
+#include <openpose/utilities/openCv.hpp>
+#include <openpose/gui/guiInfoAdder.hpp>
+#include <iomanip>
 
 using namespace std;
 
@@ -19,7 +26,7 @@ void WPostProcessing::initializationOnThread() {
     PyRun_SimpleString(cstr_cmd);
 
     pytorchModule = PyImport_Import(PyString_FromString("ModelCPPCaller"));
-    if (!pytorchModule) // 加载模块失败
+    if (!pytorchModule)
     {
         cout << "[ERROR] Python get module failed." << endl;
         return;
@@ -34,6 +41,32 @@ void WPostProcessing::initializationOnThread() {
         cout << "Get model successfully";
     }
     forwardFunc = PyObject_GetAttr(pytorchModule, PyString_FromString("forwardModel"));
+}
+
+namespace op {
+    void addInfo(cv::Mat &cvOutputData, string pros, int count) {
+        try {
+            // Security checks
+            if (cvOutputData.empty())
+                error("Wrong input element (empty cvOutputData).", __LINE__, __FUNCTION__, __FILE__);
+            // Size
+            const auto borderMargin = intRound(fastMax(cvOutputData.cols, cvOutputData.rows) * 0.025);
+            // Used colors
+            const cv::Scalar white{255, 255, 255};
+
+
+
+
+
+            // Frame number
+            putTextOnCvMat(cvOutputData, pros,
+                           {borderMargin, (int) (5 + count * 2) * borderMargin}, white, false);
+
+        }
+        catch (const std::exception &e) {
+            error(e.what(), __LINE__, __FUNCTION__, __FILE__);
+        }
+    }
 }
 
 
@@ -53,15 +86,25 @@ void WPostProcessing::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
                             std::vector<int> v1 = {i, j, 0};
                             std::vector<int> v2 = {i, j, 1};
                             args += to_string(datum.poseKeypoints.at(v1)) + "," +
-                                    to_string(datum.poseKeypoints.at(v1)) + " ";
+                                    to_string(datum.poseKeypoints.at(v2)) + " ";
 
                         }
                     }
+                    stringstream ss, ss1, ss2;
                     PyObject *pargs = PyTuple_New(2);
                     PyTuple_SetItem(pargs, 0, model);
                     PyTuple_SetItem(pargs, 1, PyString_FromString(args.c_str()));
                     PyObject *result = PyObject_CallObject(forwardFunc, pargs);
-                    cout << PyString_AsString(result) << endl;
+
+                    ss << fixed << setprecision(2) << PyString_AsString(PyTuple_GetItem(result, 0)) << " "
+                       << PyFloat_AsDouble(PyTuple_GetItem(result, 1));
+                    ss1 << fixed << setprecision(2) << PyString_AsString(PyTuple_GetItem(result, 2)) << " "
+                        << PyFloat_AsDouble(PyTuple_GetItem(result, 3));
+                    ss2 << fixed << setprecision(2) << PyString_AsString(PyTuple_GetItem(result, 4)) << " "
+                        << PyFloat_AsDouble(PyTuple_GetItem(result, 5));
+                    op::addInfo(datum.cvOutputData, ss.str(), 0);
+                    op::addInfo(datum.cvOutputData, ss1.str(), 1);
+                    op::addInfo(datum.cvOutputData, ss2.str(), 2);
                 } else {
 
                 }
@@ -77,3 +120,4 @@ void WPostProcessing::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
         op::error(e.what(), __LINE__, __FUNCTION__, __FILE__);
     }
 }
+

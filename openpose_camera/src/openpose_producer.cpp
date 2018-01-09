@@ -3,7 +3,7 @@
 using namespace Spinnaker::GenApi;
 using namespace Spinnaker::GenICam;
 
-int ConfigureCustomCamera(const Spinnaker::CameraPtr &cameraPtr)
+int ConfigureCustomCamera(const Spinnaker::CameraPtr &cameraPtr, int frameRate)
 {
     int result = 0;
 
@@ -52,6 +52,22 @@ int ConfigureCustomCamera(const Spinnaker::CameraPtr &cameraPtr)
 //        {
 //            op::log("Pixel format not available...\n" , op::Priority::High);
 //        }
+
+
+        // Set Frame Rate
+        CFloatPtr ptrFrameRate = nodeMap.GetNode("AcquisitionFrameRate");
+        if (IsAvailable(ptrFrameRate) && IsWritable(ptrFrameRate)) {
+
+            ptrFrameRate->SetValue(frameRate);
+
+            op::log("FrameRate set to " + std::to_string(ptrFrameRate->GetValue()), op::Priority::High);
+
+        } else {
+            op::log("FrameRate not available...\n", op::Priority::High);
+        }
+
+
+
 
 
         //
@@ -123,8 +139,8 @@ int ConfigureCustomCamera(const Spinnaker::CameraPtr &cameraPtr)
     return result;
 }
 
-WProducer::WProducer(int _runTime, int __millSecondsBetweenImage):
-        initialized{false}, runTime(_runTime), millSecondsBetweenImage(__millSecondsBetweenImage)
+WProducer::WProducer(int _runTime, int __millSecondsBetweenImage, int _frameRate) :
+        initialized{false}, runTime(_runTime), millSecondsBetweenImage(__millSecondsBetweenImage), frameRate(_frameRate)
 {
 }
 
@@ -262,7 +278,7 @@ void WProducer::initializationOnThread()
             cameraPtr->Init();
 
             // Configure custom image settings
-            ConfigureCustomCamera(cameraPtr);
+            ConfigureCustomCamera(cameraPtr, this->frameRate);
 
 
         }

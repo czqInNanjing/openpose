@@ -9,7 +9,7 @@
 class WProducer : public op::WorkerProducer<std::shared_ptr<std::vector<WMyDatum>>>
 {
 public:
-    WProducer(int _runTime, int _millSecondsBetweenImage);
+    WProducer(int _runTime, int _millSecondsBetweenImage, int _frameRate = 5);
 
     ~WProducer();
 
@@ -21,6 +21,7 @@ private:
     const std::chrono::time_point<std::chrono::high_resolution_clock> timerBegin = std::chrono::high_resolution_clock::now();
     const int runTime;
     const int millSecondsBetweenImage;
+    const int frameRate;
     bool initialized;
     Spinnaker::CameraList mCameraList;
     Spinnaker::SystemPtr mSystemPtr;
