@@ -236,13 +236,14 @@ int default_main()
     return 0;
 }
 
-int get_train_data(const string videoPath, vector<ActionStruct> & actionParts)
+int get_train_data(const string actionName, const string videoPath, vector<ActionStruct> &actionParts,
+                   bool oneVideoWithMultiPart)
 {
     op::log("Dealing with file " + videoPath, op::Priority::High);
     // change video file
     FLAGS_video = videoPath;
     // Processing
-    auto wUserPostProcessing = std::make_shared<WPoseExtrator>(actionParts);
+    auto wUserPostProcessing = std::make_shared<WPoseExtrator>(actionName, actionParts, oneVideoWithMultiPart);
     // GUI (Display)
     auto wUserOutput = std::make_shared<WOutPuter>();
 
@@ -310,8 +311,43 @@ int get_train_data(const string videoPath, vector<ActionStruct> & actionParts)
     return 0;
 }
 
+int parseVideoToAxisFileOfWeizmann(const string &videoFolderPath) {
+    vector<string> actionList = {"bend", "jack", "jump", "pjump", "run", "side", "skip", "walk", "wave1", "wave2"};
+    vector<string> peopleList = {"daria", "denis", "eli", "ido", "ira", "lena", "lyova", "moshe", "shahar"};
+    int result = 0;
+    int cnt = 0;
+    vector<ActionStruct> emptyVec;
+    const auto timerBegin = std::chrono::high_resolution_clock::now();
+    for (auto &action : actionList) {
+        for (auto &people : peopleList) {
+            auto dealWithOneVideo = std::chrono::high_resolution_clock::now();
+            string fullVideoPath = videoFolderPath + "/" + action + "/" + people + "_" + action + ".avi";
+            std::ifstream infile(fullVideoPath);
+            if (infile.good()) {
+                result |= get_train_data(action, fullVideoPath, emptyVec, false);
+                fstream fout("data/finished.txt", fstream::app);
+                fout << fullVideoPath << std::endl;
+                fout.flush();
+                fout.close();
+                cnt++;
+                const auto now = std::chrono::high_resolution_clock::now();
+                const auto oneVideoTime =
+                        (double) std::chrono::duration_cast<std::chrono::nanoseconds>(now - dealWithOneVideo).count()
+                        * 1e-9;
+                const auto totalTimeSec =
+                        (double) std::chrono::duration_cast<std::chrono::nanoseconds>(now - timerBegin).count()
+                        * 1e-9;
+                std::cout << "Finish " << cnt << " of " << action.size() * peopleList.size() << "with time "
+                          << oneVideoTime << "and total time" << totalTimeSec << std::endl;
+            } else {
+                std::cout << "File " << fullVideoPath << " cannot be found! " << std::endl;
+            }
+        }
+    }
+    return result;
+}
 
-int parseVideoToAxisFile(Dataset& dataset, const string& videoFolderPath)
+int parseVideoToAxisFileOfKTH(Dataset &dataset, const string &videoFolderPath)
 {
     int result = 0;
     int cnt = 0;
@@ -320,17 +356,10 @@ int parseVideoToAxisFile(Dataset& dataset, const string& videoFolderPath)
         // find if the video exist
         auto dealWithOneVideo = std::chrono::high_resolution_clock::now();
 
-        // Jump the handwaving
-        if(pair.second == "handwaving") continue;
-        if(pair.second == "boxing") continue;
-        if(pair.second == "handclapping") continue;
-        if(pair.second == "jogging") continue;
-        if(pair.second == "walking") continue;
-
         string fullVideoPath = videoFolderPath + "/" + pair.second + "/" + pair.first + "_uncomp.avi";
         std::ifstream infile(fullVideoPath);
         if(infile.good()){
-            result |= get_train_data(fullVideoPath, dataset.datas[pair.first]);
+            result |= get_train_data(pair.second, fullVideoPath, dataset.datas[pair.first], true);
             fstream fout("data/finished.txt", fstream::app);
             fout << fullVideoPath << std::endl;
             fout.flush();
@@ -359,6 +388,7 @@ int main(int argc, char *argv[])
     gflags::ParseCommandLineFlags(&argc, &argv, true);
 //    Dataset dateset = readActionsFromFile("data/00sequences.txt");
 //    // Running default_main_method
-//    return parseVideoToAxisFile(dateset, "/home/fyf/Desktop/dataset/KTH");
-    return default_main();
+//    return parseVideoToAxisFileOfKTH(dateset, "/home/fyf/Desktop/dataset/KTH");
+    return parseVideoToAxisFileOfWeizmann("/home/fyf/Desktop/dataset/Weizmann");
+//    return default_main();
 }

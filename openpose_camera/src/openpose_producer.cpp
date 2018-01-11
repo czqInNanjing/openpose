@@ -362,7 +362,7 @@ cv::Mat pointGreyToCvMat(const Spinnaker::ImagePtr &imagePtr)
 
         // reduce the image size
         cv::Mat result((int)(colsize + YPadding), (int)(rowsize + XPadding), CV_8UC3, imagePtr->GetData(), imagePtr->GetStride());
-        cv::Size size(400, 400);
+        cv::Size size(640, 480);
         cv::Mat resizedResult(size, CV_8UC3);
         cv::resize(result, resizedResult, size);
         // image data contains padding. When allocating cv::Mat container size, you need to account for the X,Y image data padding.

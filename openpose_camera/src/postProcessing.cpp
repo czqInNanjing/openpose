@@ -54,11 +54,6 @@ namespace op {
             // Used colors
             const cv::Scalar white{255, 255, 255};
 
-
-
-
-
-            // Frame number
             putTextOnCvMat(cvOutputData, pros,
                            {borderMargin, (int) (5 + count * 2) * borderMargin}, white, false);
 
@@ -79,14 +74,17 @@ void WPostProcessing::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
         if (datumsPtr != nullptr && !datumsPtr->empty()) {
             for (auto &datum : *datumsPtr) {
                 string args;
+                int rows = datum.cvInputData.rows;
+                int cols = datum.cvInputData.cols;
                 std::vector<int> dimensionSize = datum.poseKeypoints.getSize();
                 if (!dimensionSize.empty()) {
                     for (int i = 0; i < 1; ++i) {
                         for (int j = 0; j < dimensionSize[1]; ++j) {
                             std::vector<int> v1 = {i, j, 0};
                             std::vector<int> v2 = {i, j, 1};
-                            args += to_string(datum.poseKeypoints.at(v1)) + "," +
-                                    to_string(datum.poseKeypoints.at(v2)) + " ";
+                            // Normalize the data
+                            args += to_string(datum.poseKeypoints.at(v1) / cols) + "," +
+                                    to_string(datum.poseKeypoints.at(v2) / rows) + " ";
 
                         }
                     }
@@ -95,7 +93,7 @@ void WPostProcessing::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
                     PyTuple_SetItem(pargs, 0, model);
                     PyTuple_SetItem(pargs, 1, PyString_FromString(args.c_str()));
                     PyObject *result = PyObject_CallObject(forwardFunc, pargs);
-
+//                    cout << rows << cols << args << endl;
                     ss << fixed << setprecision(2) << PyString_AsString(PyTuple_GetItem(result, 0)) << " "
                        << PyFloat_AsDouble(PyTuple_GetItem(result, 1));
                     ss1 << fixed << setprecision(2) << PyString_AsString(PyTuple_GetItem(result, 2)) << " "
@@ -105,6 +103,8 @@ void WPostProcessing::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
                     op::addInfo(datum.cvOutputData, ss.str(), 0);
                     op::addInfo(datum.cvOutputData, ss1.str(), 1);
                     op::addInfo(datum.cvOutputData, ss2.str(), 2);
+                    cout << ss.str() << " " << ss1.str() << " " << ss2.str() << endl;
+
                 } else {
 
                 }
