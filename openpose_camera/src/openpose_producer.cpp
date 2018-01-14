@@ -139,8 +139,8 @@ int ConfigureCustomCamera(const Spinnaker::CameraPtr &cameraPtr, int frameRate)
     return result;
 }
 
-WProducer::WProducer(int _runTime, int __millSecondsBetweenImage, int _frameRate) :
-        initialized{false}, runTime(_runTime), millSecondsBetweenImage(__millSecondsBetweenImage), frameRate(_frameRate)
+WProducer::WProducer(int _runTime, int _frameRate) :
+        initialized{false}, runTime(_runTime), frameRate(_frameRate)
 {
 }
 

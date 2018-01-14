@@ -36,6 +36,11 @@ add_definitions(-std=c++11)
 set(OP_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -Wpedantic -Wall -Wextra -Wfatal-errors")
 
 ### PROJECT OPTIONS
+# Python Compile Flags
+SET(PYTHON_GCC_COVERAGE_COMPILE_FLAGS "-I/usr/include/python2.7 -I/usr/include/x86_64-linux-gnu/python2.7  -fno-strict-aliasing -Wdate-time -D_FORTIFY_SOURCE=2 -g -fstack-protector-strong -Wformat -Werror=format-security  -DNDEBUG -g -fwrapv -O2 -Wall -Wstrict-prototypes" CACHE FILEPATH "Python Compile Flags")
+# Python Link Flags
+SET(PYTHON_GCC_COVERAGE_LINK_FLAGS "-L/usr/lib/python2.7/config-x86_64-linux-gnu -L/usr/lib -lpython2.7 -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic -Wl,-O1 -Wl,-Bsymbolic-functions" CACHE FILEPATH "Python Link Flags")
+
 
 # Select the DL Framework
 set(DL_FRAMEWORK CAFFE CACHE STRING "Select Deep Learning Framework.")

@@ -10,7 +10,7 @@
 
 using namespace std;
 
-WPostProcessing::WPostProcessing() {}
+WPostProcessing::WPostProcessing(string _modelPath, int _maxItems) : modelPath(_modelPath), maxItems(_maxItems) {}
 
 WPostProcessing::~WPostProcessing() {
     Py_Finalize();
@@ -18,27 +18,26 @@ WPostProcessing::~WPostProcessing() {
 
 void WPostProcessing::initializationOnThread() {
     Py_Initialize();
-
-    string path = "/home/fyf/Desktop/Practice/ActionClassifier";
+    // TODO make it to gui set this path
+    string path = "./assets/python";
     string chdir_cmd = string("sys.path.append(\"") + path + "\")";
-    const char *cstr_cmd = chdir_cmd.c_str();
+
     PyRun_SimpleString("import sys");
-    PyRun_SimpleString(cstr_cmd);
+    PyRun_SimpleString(chdir_cmd.c_str());
 
     pytorchModule = PyImport_Import(PyString_FromString("ModelCPPCaller"));
     if (!pytorchModule)
     {
-        cout << "[ERROR] Python get module failed." << endl;
-        return;
+        op::error("[ERROR] Python get module failed.", __LINE__, __FUNCTION__, __FILE__);
     }
-    cout << "[INFO] Python get module succeed." << endl;
     PyObject *initFunc = PyObject_GetAttr(pytorchModule, PyString_FromString("initModel"));
 
-    PyObject *args = PyTuple_New(0);
+    PyObject *args = PyTuple_New(1);
+    PyTuple_SetItem(args, 0, PyString_FromString(modelPath.c_str()));
 
     model = PyObject_CallObject(initFunc, args);
-    if (model) {
-        cout << "Get model successfully";
+    if (!model) {
+        op::error("[ERROR] Python get model failed.", __LINE__, __FUNCTION__, __FILE__);
     }
     forwardFunc = PyObject_GetAttr(pytorchModule, PyString_FromString("forwardModel"));
 }

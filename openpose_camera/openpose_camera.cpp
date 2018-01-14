@@ -16,6 +16,7 @@
 #include <openpose_camera/headers.hpp>
 #include "src/readActionStruct.cpp"
 #include "openpose_camera/WPoseExtrator.hpp"
+#include <map>
 using namespace std;
 
 DEFINE_int32(logging_level,             3,              "The logging level. Integer in the range [0, 255]. 0 will output any log() message, while"
@@ -125,9 +126,13 @@ DEFINE_bool(process_real_time,          false,          "Enable to keep the orig
                                                         " too long, it will skip frames. If it is too fast, it will slow it down.");
 
 // Personal parameters
-DEFINE_bool(use_camera, false,          "If true, set FLIR camera as producer");
+DEFINE_bool(use_camera, false, "If true, set FLIR camera as producer");
 DEFINE_int32(run_time,                  100,            "Longest time to produce picture, when time exceeds, producer will stop");
-
+DEFINE_string(model_path, "models/ver2/model_best_ver4.pth.tar",
+              "Action Recognition Model path ");
+DEFINE_int32(max_items, 3, "Max Items to show when recognize the video");
+DEFINE_bool(output_to_avi, false, "Whether output the video to the avi");
+DEFINE_string(output_path, "output/", "Output path of the AVI video file");
 int default_main()
 {
     // logging_level
@@ -160,9 +165,9 @@ int default_main()
 
     // Initializing the user custom classes
     // Frames producer (e.g. video, webcam, ...)
-    auto wUserInput = std::make_shared<WProducer>(FLAGS_run_time, 100);
+    auto wUserInput = std::make_shared<WProducer>(FLAGS_run_time, FLAGS_camera_fps);
     // Processing
-    auto wUserPostProcessing = std::make_shared<WPostProcessing>();
+    auto wUserPostProcessing = std::make_shared<WPostProcessing>(FLAGS_model_path, FLAGS_max_items);
     // GUI (Display)
     auto wUserOutput = std::make_shared<WOutPuter>();
 
@@ -313,10 +318,12 @@ int get_train_data(const string actionName, const string videoPath, vector<Actio
 
 int parseVideoToAxisFileOfWeizmann(const string &videoFolderPath) {
     vector<string> actionList = {"bend", "jack", "jump", "pjump", "run", "side", "skip", "walk", "wave1", "wave2"};
+
     vector<string> peopleList = {"daria", "denis", "eli", "ido", "ira", "lena", "lyova", "moshe", "shahar"};
     int result = 0;
     int cnt = 0;
     vector<ActionStruct> emptyVec;
+    int total = actionList.size() * peopleList.size();
     const auto timerBegin = std::chrono::high_resolution_clock::now();
     for (auto &action : actionList) {
         for (auto &people : peopleList) {
@@ -337,8 +344,8 @@ int parseVideoToAxisFileOfWeizmann(const string &videoFolderPath) {
                 const auto totalTimeSec =
                         (double) std::chrono::duration_cast<std::chrono::nanoseconds>(now - timerBegin).count()
                         * 1e-9;
-                std::cout << "Finish " << cnt << " of " << action.size() * peopleList.size() << "with time "
-                          << oneVideoTime << "and total time" << totalTimeSec << std::endl;
+                std::cout << "Finish " << cnt << " of " << total << " with time "
+                          << oneVideoTime << " and total time " << totalTimeSec << std::endl;
             } else {
                 std::cout << "File " << fullVideoPath << " cannot be found! " << std::endl;
             }
@@ -380,15 +387,76 @@ int parseVideoToAxisFileOfKTH(Dataset &dataset, const string &videoFolderPath)
     return result;
 }
 
+map<string, string> readConfigFile(const string configPath) {
+    map<string, string> configs;
+    fstream configFile(configPath, fstream::in);
+    string line;
+    try {
+        while (!configFile.eof()) {
+            std::getline(configFile, line);
+            if (line.empty())
+                continue;
+            else if (line.find('#') != string::npos)
+                continue;
+            else {
+                string first = line.substr(0, line.find(':'));
+                string second = line.substr(line.find(':') + 1);
+                configs[first] = second;
+            }
+
+        }
+    }
+    catch (const std::exception &e) {
+        op::error(e.what(), __LINE__, __FUNCTION__, __FILE__);
+    }
+
+
+    configFile.close();
+    return configs;
+}
+
+void evaluateConfigs(const map<string, string> &configs) {
+    try {
+        for (auto &items : configs) {
+            const string &key = items.first;
+            const string &val = items.second;
+
+            if (key == "fps") {
+                FLAGS_camera_fps = stod(val);
+            } else if (key == "input") {
+                FLAGS_use_camera = val == "camera";
+            } else if (key == "process_real_time") {
+                FLAGS_process_real_time = (val == "true" || val == "TRUE");
+            } else if (key == "video_path") {
+                FLAGS_video = val;
+            } else if (key == "model_path") {
+                FLAGS_model_path = val;
+            } else if (key == "max_items") {
+                FLAGS_max_items = stoi(val);
+            } else if (key == "save_to_avi") {
+                FLAGS_output_to_avi = (val == "true" || val == "TRUE");
+            } else if (key == "save_path") {
+                FLAGS_output_path = val;
+            } else {
+                op::error("UNKNOWN Config with Key: " + key + " Val: " + val, __LINE__, __FUNCTION__, __FILE__);
+            }
+        }
+    }
+    catch (const std::exception &e) {
+        op::error(e.what(), __LINE__, __FUNCTION__, __FILE__);
+    }
+
+}
 
 
 int main(int argc, char *argv[])
 {
     // Parsing command line flags
     gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+    evaluateConfigs(readConfigFile("assets/CameraConfig.cfg"));
 //    Dataset dateset = readActionsFromFile("data/00sequences.txt");
-//    // Running default_main_method
 //    return parseVideoToAxisFileOfKTH(dateset, "/home/fyf/Desktop/dataset/KTH");
-    return parseVideoToAxisFileOfWeizmann("/home/fyf/Desktop/dataset/Weizmann");
-//    return default_main();
+//    return parseVideoToAxisFileOfWeizmann("/home/fyf/Desktop/dataset/Weizmann");
+    return default_main();
 }
