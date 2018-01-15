@@ -45,14 +45,14 @@ def initModel(model_path):
 
 
 def outputToAction(output):
-    top_n, top_i = output.data.topk(3)
-    action_i = top_i[0][0]
-    pro_i = numpy.exp(top_n[0][0])
-    action_i_2 = top_i[0][1]
-    pro_i_2 = numpy.exp(top_n[0][1])
-    action_i_3 = top_i[0][2]
-    pro_i_3 = numpy.exp(top_n[0][2])
-    return actions_list[action_i], pro_i, actions_list[action_i_2], pro_i_2, actions_list[action_i_3], pro_i_3
+    all = output.data.size()[1]
+    top_n, top_i = output.data.topk(all)
+    action_top_list = []
+    pro_top_list = []
+    for i in range(all):
+        action_top_list.append(actions_list[top_i[0][i]])
+        pro_top_list.append(numpy.exp(top_n[0][i]))
+    return action_top_list, pro_top_list
 
 
 def forwardModel(model, pose):

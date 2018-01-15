@@ -1,7 +1,6 @@
 import shutil
 
 import torch
-
 # Dataset of KTH
 actions_list = ['handwaving', 'walking', 'bg', 'boxing', 'handclapping', 'running', 'jogging']
 n_actions = len(actions_list)
@@ -23,8 +22,8 @@ data_fps = 25
 goal_fps = 5
 
 example_each_action = 500
-save_path = 'models/ver2/model6_with_scale.pth.tar'
-best_path = 'models/ver2/model6_with_scale.pth.tar'
+save_path = 'models/ver2/mode3_with_scale.pth.tar'
+best_path = 'models/ver2/mode3_with_scale.pth.tar'
 use_cuda = torch.cuda.is_available()
 # Train parameters
 train2test = 4
@@ -46,8 +45,12 @@ start_ratio = 0.6
 use_scale = True
 scale_list = [0.5, 0.75, 1.0, 1.5, 2.0]
 
+
+
 # Description of best_ver4
 # layers = 3 actions = all 7     train epochs = 40000  lowest loss = 0.17 start_ratio = 0.8
 
 # Description of best_ver5
 # layers = 3 actions = all 7     train epochs = 50000  lowest_loss = 0.17 start_ratio = 0.6
+
+

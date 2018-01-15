@@ -16,6 +16,7 @@
 #include <openpose_camera/headers.hpp>
 #include "src/readActionStruct.cpp"
 #include "openpose_camera/WPoseExtrator.hpp"
+#include <openpose/producer/videoReader.hpp>
 #include <map>
 using namespace std;
 
@@ -102,7 +103,7 @@ DEFINE_string(write_heatmaps,           "",             "Directory to write body
                                                         " must be enabled.");
 DEFINE_string(write_heatmaps_format,    "png",          "File extension and format for `write_heatmaps`, analogous to `write_images_format`."
                                                         " For lossless compression, recommended `png` for integer `heatmaps_scale` and `float` for"
-                                                        " floating values.");                                                     
+                                                        " floating values.");
 
 
 // Producer
@@ -126,13 +127,15 @@ DEFINE_bool(process_real_time,          false,          "Enable to keep the orig
                                                         " too long, it will skip frames. If it is too fast, it will slow it down.");
 
 // Personal parameters
-DEFINE_bool(use_camera, false, "If true, set FLIR camera as producer");
+DEFINE_bool(use_camera,                 false,          "If true, set FLIR camera as producer");
 DEFINE_int32(run_time,                  100,            "Longest time to produce picture, when time exceeds, producer will stop");
-DEFINE_string(model_path, "models/ver2/model_best_ver4.pth.tar",
-              "Action Recognition Model path ");
-DEFINE_int32(max_items, 3, "Max Items to show when recognize the video");
-DEFINE_bool(output_to_avi, false, "Whether output the video to the avi");
-DEFINE_string(output_path, "output/", "Output path of the AVI video file");
+DEFINE_string(model_path,               "models/ver2/model_best_ver4.pth.tar",
+                                                        "Action Recognition Model path ");
+DEFINE_int32(max_items,                 3,              "Max Items to show when recognize the video");
+DEFINE_bool(output_to_avi,              false,          "Whether output the video to the avi");
+DEFINE_string(output_path,              "output/",      "Output path of the AVI video file");
+DEFINE_int32(compute_within,             1,             "Update the probability based on the result of how many frames");
+DEFINE_double(output_fps,                5.0,           "Output video FPS");
 int default_main()
 {
     // logging_level
@@ -166,20 +169,12 @@ int default_main()
     // Initializing the user custom classes
     // Frames producer (e.g. video, webcam, ...)
     auto wUserInput = std::make_shared<WProducer>(FLAGS_run_time, FLAGS_camera_fps);
-    // Processing
-    auto wUserPostProcessing = std::make_shared<WPostProcessing>(FLAGS_model_path, FLAGS_max_items);
-    // GUI (Display)
-    auto wUserOutput = std::make_shared<WOutPuter>();
-
-    op::Wrapper<std::vector<WMyDatum>> opWrapper;
 
 
-    // Add custom processing
-    const auto workerProcessingOnNewThread = true;
-    opWrapper.setWorkerPostProcessing(wUserPostProcessing, workerProcessingOnNewThread);
-    // Add custom output
-    const auto workerOutputOnNewThread = true;
-    opWrapper.setWorkerOutput(wUserOutput, workerOutputOnNewThread);
+
+
+
+
 
     // Configure OpenPose
     const op::WrapperStructPose wrapperStructPose{!FLAGS_body_disable, netInputSize, outputSize, keypointScale,
@@ -200,12 +195,13 @@ int default_main()
                                                       FLAGS_write_heatmaps, FLAGS_write_heatmaps_format};
 
     // which input source to use
+    op::Wrapper<std::vector<WMyDatum>> opWrapper;
     op::WrapperStructInput wrapperStructInput{};
     if(FLAGS_use_camera) {
         const auto workerInputOnNewThread = true;
         opWrapper.setWorkerInput(wUserInput, workerInputOnNewThread);
     } else {
-        // Or use default input
+        // TODO Now we only supports video input, if input is images, will cause exception
         // producerType
         const auto producerSharedPtr = op::flagsToProducer(FLAGS_image_dir, FLAGS_video, FLAGS_ip_camera, FLAGS_camera,
                                                            FLAGS_camera_resolution, FLAGS_camera_fps);
@@ -213,8 +209,16 @@ int default_main()
         wrapperStructInput = op::WrapperStructInput{producerSharedPtr, FLAGS_frame_first, FLAGS_frame_last,
                                                         FLAGS_process_real_time, FLAGS_frame_flip, FLAGS_frame_rotate,
                                                         FLAGS_frames_repeat};
-    }
 
+    }
+    auto wUserPostProcessing = std::make_shared<WPostProcessing>(FLAGS_model_path, FLAGS_max_items, FLAGS_compute_within);
+    auto wUserOutput = std::make_shared<WOutPuter>(FLAGS_output_fps, FLAGS_output_to_avi, FLAGS_output_path);
+
+    const auto workerProcessingOnNewThread = true;
+    opWrapper.setWorkerPostProcessing(wUserPostProcessing, workerProcessingOnNewThread);
+
+    const auto workerOutputOnNewThread = true;
+    opWrapper.setWorkerOutput(wUserOutput, workerOutputOnNewThread);
 
 
 
@@ -437,8 +441,12 @@ void evaluateConfigs(const map<string, string> &configs) {
                 FLAGS_output_to_avi = (val == "true" || val == "TRUE");
             } else if (key == "save_path") {
                 FLAGS_output_path = val;
+            } else if (key == "output_fps") {
+                FLAGS_output_fps = stod(val);
+            } else if (key == "compute_within") {
+                FLAGS_compute_within = stoi(val);
             } else {
-                op::error("UNKNOWN Config with Key: " + key + " Val: " + val, __LINE__, __FUNCTION__, __FILE__);
+                op::log("WARNING: UNKNOWN Config with Key: " + key + " Val: " + val, op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
             }
         }
     }

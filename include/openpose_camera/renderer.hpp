@@ -6,17 +6,25 @@
 #include <openpose/headers.hpp>
 #include <openpose_camera/myDatum.hpp>
 
-// This worker will do 3-D rendering
+
 class WOutPuter : public op::WorkerConsumer<std::shared_ptr<std::vector<WMyDatum>>>
 {
 public:
-    WOutPuter(){}
+    WOutPuter(double _fps=5.0, bool _saveToVideo= false, std::string _outputPath="output/"): fps(_fps), saveToVideo(_saveToVideo), outputPath(_outputPath){}
 
     void initializationOnThread();
 
     void workConsumer(const std::shared_ptr<std::vector<WMyDatum>>& datumsPtr);
 
+    void tryStop();
+
 private:
+    // input source fps
+    const double fps;
+    const bool saveToVideo;
+    std::vector<WMyDatum> toBeSaved;
+    const std::string outputPath;
+    op::FrameDisplayer frameDisplayer;
 };
 
 #endif // OPENPOSE_OUTPUTER_HPP

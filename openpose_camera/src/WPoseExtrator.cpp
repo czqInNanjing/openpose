@@ -3,11 +3,10 @@
 //
 
 #include "openpose_camera/WPoseExtrator.hpp"
-#include <fstream>
 
 void writeToFile(string actionName, OneActionAxis axis) {
     fstream fout("data/Weizmann/" + actionName + ".txt", fstream::app);
-    fout << "Num of frames: " <<  axis.x.size() << std::endl;
+    fout << "Num of frames: " << axis.x.size() << std::endl;
     for (int i = 0; i < axis.x.size(); ++i) {
         for (int j = 0; j < axis.x[i].size(); ++j) {
             fout << axis.x[i][j] << "," << axis.y[i][j] << " ";
@@ -17,7 +16,6 @@ void writeToFile(string actionName, OneActionAxis axis) {
     fout.flush();
     fout.close();
 }
-
 
 
 void WPoseExtrator::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
@@ -81,7 +79,7 @@ void WPoseExtrator::work(std::shared_ptr<std::vector<WMyDatum>> &datumsPtr) {
         }
     }
     catch (const std::exception &e) {
-        op::log("Some kind of unexpected error happened.");
+        op::log("Some kind of unexpected error happened.", op::Priority::Max);
         this->stop();
         op::error(e.what(), __LINE__, __FUNCTION__, __FILE__);
     }
