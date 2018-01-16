@@ -104,8 +104,6 @@ DEFINE_string(write_heatmaps,           "",             "Directory to write body
 DEFINE_string(write_heatmaps_format,    "png",          "File extension and format for `write_heatmaps`, analogous to `write_images_format`."
                                                         " For lossless compression, recommended `png` for integer `heatmaps_scale` and `float` for"
                                                         " floating values.");
-
-
 // Producer
 DEFINE_int32(camera,                    -1,             "The camera index for cv::VideoCapture. Integer in the range [0, 9]. Select a negative"
                                                         " number (by default), to auto-detect and open the first available camera.");
@@ -136,6 +134,13 @@ DEFINE_bool(output_to_avi,              false,          "Whether output the vide
 DEFINE_string(output_path,              "output/",      "Output path of the AVI video file");
 DEFINE_int32(compute_within,             1,             "Update the probability based on the result of how many frames");
 DEFINE_double(output_fps,                5.0,           "Output video FPS");
+
+// Display
+DEFINE_bool(fullscreen,                 false,          "Run in full-screen mode (press f during runtime to toggle).");
+DEFINE_bool(gui_verbose,                false,          "Do not write text on output images on GUI (e.g. number of current frame and people). It"
+                                                        " does not affect the pose rendering.");
+DEFINE_bool(show_gui,                   true,          "Open a display window. Useful if there is no X server and/or to slightly speed up"
+                                                        " the processing if visual output is not required.");
 int default_main()
 {
     // logging_level
@@ -163,20 +168,23 @@ int default_main()
     const bool enableGoogleLogging = true;
 
 
-    // Logging
-    op::log("", op::Priority::Low, __LINE__, __FUNCTION__, __FILE__);
-
-    // Initializing the user custom classes
-    // Frames producer (e.g. video, webcam, ...)
-    auto wUserInput = std::make_shared<WProducer>(FLAGS_run_time, FLAGS_camera_fps);
-
-
-
-
-
-
-
-    // Configure OpenPose
+    /*
+     * Configure OpenPose
+     */
+    op::Wrapper<std::vector<WMyDatum>> opWrapper;
+    // Configure Input
+    std::shared_ptr<op::Producer> producerSharedPtr;
+    if(FLAGS_use_camera) { // use FLIR camera as producer
+        // TODO  make our WProducer a child class of Producer so that we can reuse the producerSharedPtr
+        producerSharedPtr = nullptr;
+        auto myInput = std::make_shared<WProducer>(FLAGS_run_time, FLAGS_camera_fps);
+        opWrapper.setWorkerInput(myInput, true);
+    } else { // use default producer
+        producerSharedPtr = op::flagsToProducer(FLAGS_image_dir, FLAGS_video, FLAGS_ip_camera, FLAGS_camera, FLAGS_camera_resolution, FLAGS_camera_fps);
+    }
+    const op::WrapperStructInput wrapperStructInput{producerSharedPtr, FLAGS_frame_first, FLAGS_frame_last,
+                                                FLAGS_process_real_time, FLAGS_frame_flip, FLAGS_frame_rotate,
+                                                FLAGS_frames_repeat};
     const op::WrapperStructPose wrapperStructPose{!FLAGS_body_disable, netInputSize, outputSize, keypointScale,
                                                   FLAGS_num_gpu, FLAGS_num_gpu_start, FLAGS_scale_number,
                                                   (float)FLAGS_scale_gap, op::flagsToRenderMode(FLAGS_render_pose),
@@ -184,48 +192,17 @@ int default_main()
                                                   (float)FLAGS_alpha_heatmap, FLAGS_part_to_show, FLAGS_model_folder,
                                                   heatMapTypes, heatMapScale, (float)FLAGS_render_threshold,
                                                   enableGoogleLogging};
-    // never use default display
-    // instead, use our renderer to display if we want
-    const bool displayGui = false;
-    const bool guiVerbose = true;
-    const bool fullScreen = false;
-    const op::WrapperStructOutput wrapperStructOutput{displayGui, guiVerbose, fullScreen, FLAGS_write_keypoint,
+    const op::WrapperStructOutput wrapperStructOutput{FLAGS_show_gui, FLAGS_gui_verbose, FLAGS_fullscreen, FLAGS_write_keypoint,
                                                       op::stringToDataFormat(FLAGS_write_keypoint_format), FLAGS_write_keypoint_json,
                                                       FLAGS_write_coco_json, FLAGS_write_images, FLAGS_write_images_format, FLAGS_write_video,
                                                       FLAGS_write_heatmaps, FLAGS_write_heatmaps_format};
-
-    // which input source to use
-    op::Wrapper<std::vector<WMyDatum>> opWrapper;
-    op::WrapperStructInput wrapperStructInput{};
-    if(FLAGS_use_camera) {
-        const auto workerInputOnNewThread = true;
-        opWrapper.setWorkerInput(wUserInput, workerInputOnNewThread);
-    } else {
-        // TODO Now we only supports video input, if input is images, will cause exception
-        // producerType
-        const auto producerSharedPtr = op::flagsToProducer(FLAGS_image_dir, FLAGS_video, FLAGS_ip_camera, FLAGS_camera,
-                                                           FLAGS_camera_resolution, FLAGS_camera_fps);
-        // Producer (use default to disable any input)
-        wrapperStructInput = op::WrapperStructInput{producerSharedPtr, FLAGS_frame_first, FLAGS_frame_last,
-                                                        FLAGS_process_real_time, FLAGS_frame_flip, FLAGS_frame_rotate,
-                                                        FLAGS_frames_repeat};
-
-    }
+    // Configure wrapper
+    opWrapper.configure(wrapperStructPose, wrapperStructInput, wrapperStructOutput);
     auto wUserPostProcessing = std::make_shared<WPostProcessing>(FLAGS_model_path, FLAGS_max_items, FLAGS_compute_within);
     auto wUserOutput = std::make_shared<WOutPuter>(FLAGS_output_fps, FLAGS_output_to_avi, FLAGS_output_path);
+    opWrapper.setWorkerPostProcessing(wUserPostProcessing, true);
+    opWrapper.setWorkerOutput(wUserOutput, true);
 
-    const auto workerProcessingOnNewThread = true;
-    opWrapper.setWorkerPostProcessing(wUserPostProcessing, workerProcessingOnNewThread);
-
-    const auto workerOutputOnNewThread = true;
-    opWrapper.setWorkerOutput(wUserOutput, workerOutputOnNewThread);
-
-
-
-
-    // Configure wrapper
-    opWrapper.configure(wrapperStructPose, op::WrapperStructFace{}, op::WrapperStructHand{}, wrapperStructInput,
-                        wrapperStructOutput);
     // Set to single-thread running (to debug and/or reduce latency)
     if (FLAGS_disable_multi_thread)
        opWrapper.disableMultiThreading();
@@ -437,6 +414,9 @@ void evaluateConfigs(const map<string, string> &configs) {
                 FLAGS_model_path = val;
             } else if (key == "max_items") {
                 FLAGS_max_items = stoi(val);
+                /*
+                 * Start of the Output setting
+                 */
             } else if (key == "save_to_avi") {
                 FLAGS_output_to_avi = (val == "true" || val == "TRUE");
             } else if (key == "save_path") {
@@ -445,6 +425,17 @@ void evaluateConfigs(const map<string, string> &configs) {
                 FLAGS_output_fps = stod(val);
             } else if (key == "compute_within") {
                 FLAGS_compute_within = stoi(val);
+                /*
+                 * Start of the Display setting
+                 */
+            }  else if (key == "show_gui") {
+                FLAGS_show_gui = (val == "true" || val == "TRUE");
+            } else if (key == "gui_verbose") {
+                FLAGS_gui_verbose = (val == "true" || val == "TRUE");
+            } else if (key == "fullscreen") {
+                FLAGS_fullscreen = (val == "true" || val == "TRUE");
+            } else if (key == "render_pose") {
+                FLAGS_render_pose = (val == "true" || val == "TRUE") ? 1 : 0;
             } else {
                 op::log("WARNING: UNKNOWN Config with Key: " + key + " Val: " + val, op::Priority::High, __LINE__, __FUNCTION__, __FILE__);
             }

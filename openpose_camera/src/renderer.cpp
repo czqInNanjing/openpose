@@ -17,7 +17,7 @@ void WOutPuter::workConsumer(const std::shared_ptr<std::vector<WMyDatum>> &datum
                 if (saveToVideo) {
                     toBeSaved.push_back(datum);
                 }
-                frameDisplayer.displayFrame(datum.cvOutputData, 1);
+//                frameDisplayer.displayFrame(datum.cvOutputData, 1);
             }
         }
     }
@@ -43,7 +43,7 @@ void WOutPuter::tryStop() {
                 );
 
                 cv::VideoWriter outputVideo;
-                if (outputVideo.open(name, CV_FOURCC('P', 'I', 'M', '1'), fps, size, true)) {
+                if (outputVideo.open(name, CV_FOURCC('M','J','P','G'), fps, size, true)) {
                     for (auto outputFrame : toBeSaved) {
                         outputVideo << outputFrame.cvOutputData;
                     }
